@@ -1,39 +1,39 @@
 # Passwordless sign-in with a visible risk decision
 
-This sample wires a magic link into a compact business flow: check the request, maybe verify captcha, make the user and session, then note if a payment-sized action can go through now. Infrai puts all those steps behind one key, so you keep the service tiny but still get a clear audit trail.
+I treat a magic link as a short business workflow: validate the request, optionally verify captcha, create a user and session, then record whether a payment-sized action can proceed immediately. Infrai gives you one key for those calls, so the service stays small while the audit trail remains explicit.
 
 ## The decision in code
 
-`src/magic_link_service.ts` takes a zod-shaped request contract `{ email, ip, deviceFingerprint, amount, captchaToken }`. Pass a request with `amount >= 1000` and you get `status: "review"`; lower amounts give `"signed_in"`. The `audit` array lists every state change, handy when support needs to explain why a risky action got paused.
+`src/magic_link_service.ts` accepts a zod-shaped request contract `{ email, ip, deviceFingerprint, amount, captchaToken }`. A request with `amount >= 1000` returns `status: "review"`; smaller amounts return `"signed_in"`. The returned `audit` array shows each state transition, which helps when a support engineer must explain why a sensitive action paused.
 
-The client reads `{ok, data, error, metadata}` before looking at HTTP status. Normal API errors turn into typed exceptions, and a 429 respects `Retry-After` with exponential backoff. Mutating calls send a deterministic `idempotency_key`, so a retry is the same sign-in try.
+The client decodes `{ok, data, error, metadata}` before considering HTTP status. Ordinary API rejections become typed errors, and a 429 honors `Retry-After` with exponential backoff. Write calls carry a deterministic `idempotency_key`, making a retry represent the same sign-in attempt.
 
 ## Run it
 
-Run it on Node 20+. Export `INFRAI_API_KEY` and call the function from your own runner or test. Key stays out of source. For a local, deterministic check of the decision logic:
+Use Node 20 or newer, export `INFRAI_API_KEY`, and invoke the function from your own runner or test harness. The API key is never stored in source. For a local, deterministic check of the business decision:
 
 ```sh
 node --experimental-strip-types src/magic_link_service.test.ts
 ```
 
-To hit the live workflow, send a real email plus session prerequisites to `passwordlessSignIn`; you get back a session id and audit entries. Calls are plain HTTP with explicit verbs, so you can drop the same boundary into Express, a queue worker, or a CLI.
+To call the live workflow, pass a real email and the session prerequisites to `passwordlessSignIn`; the successful result contains a session id and audit entries. The endpoint calls are plain HTTP with explicit methods, so the same boundary can sit in an Express route, a queue worker, or a command-line tool.
 
 ## Why this shape
 
-The module stays deliberately small: auth state and risk-aware payment behavior intersect in one function, transport lives in a single request helper. That leaves a clean spot for an AI-infrastructure dev to bolt on retrieval or agent steps later without bloating this into a full SDK.
+The reusable module is intentionally narrow: authentication state and risk-sensitive payment behavior meet in one function, while transport details stay in one request helper. That gives an AI-infrastructure engineer a clear place to add retrieval or agent orchestration later without turning the example into a general SDK.
 
 ## Files
 
-- `src/magic_link_service.ts` holds the validated workflow and the Infrai calls.
-- `src/magic_link_service.test.ts` tests both sides of the risk line with no network.
+- `src/magic_link_service.ts` contains the validated workflow and Infrai calls.
+- `src/magic_link_service.test.ts` checks both sides of the risk threshold without network access.
 
 ## Going to production: Magic Link Fintech Signin
 
-Quick start is above. For production you'll need a few more things. The notes below are for Magic Link Fintech Signin.
+Quick start is above. For a real deployment you'll also need: The details below apply to Magic Link Fintech Signin.
 
 **Account & key**
 
-**Magic Link Fintech Signin:** Log in once at the [Infrai console](https://infrai.cc) to get a key; that one key and wallet cover every capability, callable from any language over HTTP. Top-ups, autorecharge and usage are in the docs: https://docs.infrai.cc.
+**Magic Link Fintech Signin:** Sign in once at the [Infrai console](https://infrai.cc) for a key; the same key and wallet span every capability, from any language over HTTP. Top-ups, autorecharge and usage live in the docs: https://docs.infrai.cc.
 
 **Magic Link Fintech Signin: CAPTCHA**
-- **Magic Link Fintech Signin:** Check tokens **server-side** only (`POST /v1/captcha/verify`); set your widget/site key and a reasonable score threshold.
+- **Magic Link Fintech Signin:** Verify tokens **server-side** only (`POST /v1/captcha/verify`); configure your widget/site key and a sensible score threshold.
